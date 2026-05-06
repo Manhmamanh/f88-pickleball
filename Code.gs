@@ -80,6 +80,5 @@ function notifyPickleball(row) {
     '<b>💰 Cược:</b> ' + row[5] + ' (' + row[6] + 'đ)\n' +
     (row[7] ? '<b>📝 Ghi chú:</b> ' + row[7] + '\n' : '');
 
-  try { sendTelegram(msg, CHANNEL_ID); } catch(e) {}
   try { sendTelegram(msg, OWNER_CHAT_ID); } catch(e) {}
 }
