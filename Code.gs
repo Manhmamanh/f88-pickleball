@@ -1,98 +1,85 @@
-// F88 Pickleball - Thông báo đăng ký mới qua Telegram
+// F88 Pickleball - Đăng ký + Thông báo Telegram
 
 const SHEET_ID = '1bYzGiBg7iTSPX0r3CtgTDJwIGIVcXuTObUp-ODSTasE';
 const SHEET_NAME = 'Trang tính1';
 const BOT_TOKEN = '8713404626:AAFMq4dFLqSY3z7e3qI9JyrU-2ldSClRm0o';
-const CHANNEL_ID = '-1003988859676'; // Kênh chung
+const CHANNEL_ID = '-1003988859676';
 const OWNER_CHAT_ID = '1961589891';
 
-function sendTelegram(msg, chatId) {
-  const url = 'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage';
-  const payload = {
-    chat_id: chatId,
-    text: msg,
-    parse_mode: 'HTML',
-    disable_web_page_preview: true
-  };
-  UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload)
-  });
+// === DO GET - Kiểm tra API ===
+function doGet() {
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: 'ok', message: 'F88 Pickleball API running' }))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-// Hàm này chạy khi có người đăng ký mới
-function onNewRegistration(event) {
-  // event là object từ trigger onFormSubmit hoặc onEdit
+// === DO POST - Nhận đăng ký + Ghi sheet + Thông báo ===
+function doPost(e) {
   try {
-    let row, values;
-    
-    if (event && event.values) {
-      // Google Form trigger
-      values = event.values;
-    } else if (event && event.range) {
-      // onEdit trigger — lấy row vừa edit
-      const sheet = event.source.getActiveSheet();
-      if (sheet.getName() !== SHEET_NAME) return;
-      const rowNum = event.range.getRow();
-      if (rowNum <= 1) return;
-      values = sheet.getRange(rowNum, 1, 1, 9).getValues()[0];
+    let data;
+    if (e.postData && e.postData.type === 'application/json') {
+      data = JSON.parse(e.postData.contents);
+    } else if (e.parameters) {
+      data = {};
+      for (const key in e.parameters) data[key] = e.parameters[key][0];
     } else {
-      // Manual fallback: check row mới nhất
-      const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
-      const lastRow = sheet.getLastRow();
-      if (lastRow <= 1) return;
-      values = sheet.getRange(lastRow, 1, 1, 9).getValues()[0];
+      throw new Error('Unsupported format');
     }
-    
-    if (!values || values.length < 6) return;
-    
-    const time = values[0] || '';
-    const t1p1 = values[1] || '';
-    const t1p2 = values[2] || '';
-    const t2p1 = values[3] || '';
-    const t2p2 = values[4] || '';
-    const bet = values[5] || '';
-    const amount = values[6] || '';
-    const note = values[7] || '';
-    
-    const msg = 
-      '<b>🏓 ĐĂNG KÝ MỚI — F88 Pickleball</b>\n\n' +
-      '<b>⏰</b> ' + time + '\n\n' +
-      '<b>🔵 ĐỘI 1:</b>\n' +
-      '  1. ' + t1p1 + '\n' +
-      '  2. ' + t1p2 + '\n\n' +
-      '<b>🔴 ĐỘI 2:</b>\n' +
-      '  1. ' + t2p1 + '\n' +
-      '  2. ' + t2p2 + '\n\n' +
-      '<b>💰 Cược:</b> ' + bet + ' (' + amount + 'đ)\n' +
-      (note ? '<b>📝 Ghi chú:</b> ' + note + '\n' : '') +
-      '\n📲 https://manhmamanh.github.io/f88-pickleball/';
 
-    // Gửi vào channel chung
-    try {
-      sendTelegram(msg, CHANNEL_ID);
-    } catch(e) {}
-    
-    // Gửi riêng cho Mạnh Ca Ca
-    try {
-      sendTelegram(msg, OWNER_CHAT_ID);
-    } catch(e) {}
-    
-  } catch(err) {
-    // Log lỗi vào sheet
-    try {
-      const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Trang tính1');
-      sheet.getRange(sheet.getLastRow() + 1, 1).setValue('ERROR: ' + err.toString());
-    } catch(e) {}
+    const now = new Date();
+    const timeStr = Utilities.formatDate(now, 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
+
+    const row = [
+      timeStr,
+      data.team1Player1 || '',
+      data.team1Player2 || '',
+      data.team2Player1 || '',
+      data.team2Player2 || '',
+      data.betMultiplier || '',
+      data.betAmount || '',
+      data.note || '',
+      'Đã đăng ký'
+    ];
+
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    sheet.appendRow(row);
+
+    // Gửi thông báo Telegram
+    notifyPickleball(row);
+
+    return HtmlService.createHtmlOutput(
+      '<html><body><script>window.close()</script>Đã đăng ký thành công!</body></html>'
+    );
+  } catch (err) {
+    return HtmlService.createHtmlOutput(
+      '<html><body>Lỗi: ' + err.toString() + '</body></html>'
+    );
   }
 }
 
-// Trigger function — đặt tên dễ nhớ
-function onFormSubmit(e) {
-  onNewRegistration(e);
+// === GỬI TELEGRAM ===
+function sendTelegram(msg, chatId) {
+  const url = 'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage';
+  UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      chat_id: chatId, text: msg, parse_mode: 'HTML',
+      disable_web_page_preview: true
+    })
+  });
 }
 
-function onEditNotify(e) {
-  onNewRegistration(e);
+// === THÔNG BÁO ĐĂNG KÝ MỚI ===
+function notifyPickleball(row) {
+  const msg =
+    '<b>🏓 ĐĂNG KÝ MỚI — F88 Pickleball</b>\n\n' +
+    '<b>⏰</b> ' + (row[0] || '') + '\n\n' +
+    '<b>🔵 ĐỘI 1:</b>\n  1. ' + row[1] + '\n  2. ' + row[2] + '\n\n' +
+    '<b>🔴 ĐỘI 2:</b>\n  1. ' + row[3] + '\n  2. ' + row[4] + '\n\n' +
+    '<b>💰 Cược:</b> ' + row[5] + ' (' + row[6] + 'đ)\n' +
+    (row[7] ? '<b>📝 Ghi chú:</b> ' + row[7] + '\n' : '');
+
+  try { sendTelegram(msg, CHANNEL_ID); } catch(e) {}
+  try { sendTelegram(msg, OWNER_CHAT_ID); } catch(e) {}
 }
