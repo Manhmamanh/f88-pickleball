@@ -396,29 +396,67 @@ document.getElementById('pickleForm').addEventListener('submit', async (e) => {
   btn.textContent = 'Đang gửi...';
 
   try {
-    const payload = {
-      team1Player1: fields.t1p1,
-      team1Player2: fields.t1p2,
-      team2Player1: fields.t2p1,
-      team2Player2: fields.t2p2,
-      betMultiplier: selectedBet + 'x (' + (selectedBet * 10000).toLocaleString('vi-VN') + '₫)',
-      betAmount: (selectedBet * 10000).toLocaleString('vi-VN'),
-      note: document.getElementById('note').value.trim()
-    };
+    // Gửi dữ liệu dạng URL-encoded tới Apps Script Web App
+    const params = new URLSearchParams();
+    params.append('team1Player1', fields.t1p1);
+    params.append('team1Player2', fields.t1p2);
+    params.append('team2Player1', fields.t2p1);
+    params.append('team2Player2', fields.t2p2);
+    params.append('betMultiplier', selectedBet + 'x (' + (selectedBet * 10000).toLocaleString('vi-VN') + '₫)');
+    params.append('betAmount', (selectedBet * 10000).toLocaleString('vi-VN'));
+    params.append('note', document.getElementById('note').value.trim() || '');
 
-    const res = await fetch(APPS_SCRIPT_URL, {
+    // Dùng fetch với mode no-cors và content-type x-www-form-urlencoded
+    await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
     });
 
-    // no-cors mode returns opaque — treat as success
+    // Luôn hiện thành công (no-cors không đọc được response)
     document.getElementById('pickleForm').style.display = 'none';
     document.getElementById('successMsg').classList.add('show');
 
   } catch (err) {
-    // If no-cors fails too, show success anyway (mostly works)
+    // Nếu fetch fail, thử phương án dự phòng: submit qua iframe
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.name = 'pickleSubmit';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = APPS_SCRIPT_URL;
+      form.target = 'pickleSubmit';
+
+      const fieldsData = {
+        team1Player1: fields.t1p1,
+        team1Player2: fields.t1p2,
+        team2Player1: fields.t2p1,
+        team2Player2: fields.t2p2,
+        betMultiplier: selectedBet + 'x (' + (selectedBet * 10000).toLocaleString('vi-VN') + '₫)',
+        betAmount: (selectedBet * 10000).toLocaleString('vi-VN'),
+        note: document.getElementById('note').value.trim() || ''
+      };
+
+      for (const [key, val] of Object.entries(fieldsData)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = val;
+        form.appendChild(input);
+      }
+
+      document.body.appendChild(form);
+      form.submit();
+      setTimeout(() => {
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+      }, 1000);
+    } catch(e) {}
+
     document.getElementById('pickleForm').style.display = 'none';
     document.getElementById('successMsg').classList.add('show');
   }

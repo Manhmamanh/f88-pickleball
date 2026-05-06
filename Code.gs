@@ -1,23 +1,37 @@
-// F88 Pickleball - Google Apps Script Web App
-// Deploy as Web App -> Anyone with link can access
+// F88 Pickleball - Google Apps Script Web App v2
+// Xử lý cả JSON và form-urlencoded
 
 const SHEET_ID = '1bYzGiBg7iTSPX0r3CtgTDJwIGIVcXuTObUp-ODSTasE';
 const SHEET_NAME = 'Trang tính1';
 
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    let data;
+    
+    // Xử lý cả JSON và form-urlencoded
+    if (e.postData && e.postData.type === 'application/json') {
+      data = JSON.parse(e.postData.contents);
+    } else if (e.parameters) {
+      // form-urlencoded
+      data = {};
+      for (const key in e.parameters) {
+        data[key] = e.parameters[key][0];
+      }
+    } else {
+      throw new Error('Unsupported content type');
+    }
+    
     const now = new Date();
     const timeStr = Utilities.formatDate(now, 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
     
     const row = [
       timeStr,
-      data.team1Player1,
-      data.team1Player2,
-      data.team2Player1,
-      data.team2Player2,
-      data.betMultiplier,
-      data.betAmount,
+      data.team1Player1 || '',
+      data.team1Player2 || '',
+      data.team2Player1 || '',
+      data.team2Player2 || '',
+      data.betMultiplier || '',
+      data.betAmount || '',
       data.note || '',
       'Đã đăng ký'
     ];
@@ -25,13 +39,11 @@ function doPost(e) {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     sheet.appendRow(row);
     
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: true, message: 'Đăng ký thành công!' }))
-      .setMimeType(ContentService.MimeType.JSON);
+    // Trả về HTML để iframe/hidden form không báo lỗi
+    return HtmlService.createHtmlOutput('<html><body><script>window.close()</script>Đã đăng ký thành công!</body></html>');
+    
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return HtmlService.createHtmlOutput('<html><body>Lỗi: ' + err.toString() + '</body></html>');
   }
 }
 
