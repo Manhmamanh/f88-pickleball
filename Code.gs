@@ -2,7 +2,7 @@
 
 const SHEET_ID = '1bYzGiBg7iTSPX0r3CtgTDJwIGIVcXuTObUp-ODSTasE';
 const SHEET_NAME = 'Trang tính1';
-const BOT_TOKEN = '8713403489:AAFanbT3ueV4FRaGzyIg1JIoy07xsKNRm0o';
+const BOT_TOKEN = '8603898262:AAGJnzbvhHwgq4cePzYsJnNcl7fbH9cuBwM';
 const CHANNEL_ID = '-1003988859676';
 const OWNER_CHAT_ID = '1961589891';
 
